@@ -97,7 +97,10 @@ public class RequestService {
             userMessage.setChatId(String.valueOf(request.getChatId()));
             userMessage.setText("Ответ оператора:\n\n" + responseText + 
                               "\n\n---\nЕсли у вас есть еще вопросы, нажмите 'Обращение' снова.");
+            
+            log.info("Sending response to user chatId: {}, requestId: {}", request.getChatId(), requestId);
             bot.execute(userMessage);
+            log.info("Response sent successfully to user");
         } catch (Exception e) {
             log.error("Error sending response to user: {}", e.getMessage(), e);
         }

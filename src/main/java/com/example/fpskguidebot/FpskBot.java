@@ -91,9 +91,17 @@ public class FpskBot extends TelegramLongPollingBot {
             case "📞 Statement" -> startSupportRequest(chatId, update);
             default -> {
                 if (messageText.startsWith("/answer") && chatId == operatorChatId) {
+                    log.info("Operator {} processing answer command: {}", chatId, messageText);
                     yield requestService.createAnswerCommandResponse(messageText, this);
                 } else if (messageText.equals("/list") && chatId == operatorChatId) {
+                    log.info("Operator {} processing list command", chatId);
                     yield requestService.createListCommandResponse();
+                } else if (messageText.startsWith("/answer")) {
+                    log.warn("Non-operator {} tried to use answer command: {}", chatId, messageText);
+                    SendMessage errorMsg = new SendMessage();
+                    errorMsg.setChatId(String.valueOf(chatId));
+                    errorMsg.setText("Эта команда доступна только операторам");
+                    yield errorMsg;
                 } else if (messageText.contains("🌐") && (messageText.contains("Язык") || messageText.contains("Тил") || messageText.contains("Language"))) {
                     yield createLanguageSelectionMessage(chatId);
                 } else {
