@@ -1,0 +1,1 @@
+java -jar ../FPSKGuideBot.jar ID_TOKEN=8708949062:AAECPvamPo3yGEFUiujYd0b3kpPQ706LJeQ
