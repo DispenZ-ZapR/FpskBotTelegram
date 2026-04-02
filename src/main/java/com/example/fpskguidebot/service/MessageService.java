@@ -139,6 +139,98 @@ public class MessageService {
         };
     }
     
+    public String getRequestPromptMessage(Language language) {
+        return switch (language) {
+            case RU -> "✍️ Напишите ваше обращение:\n\n" +
+                    "Пожалуйста, опишите вашу проблему или вопрос. " +
+                    "Наш оператор рассмотрит его и ответит в ближайшее время.\n\n" +
+                    "⚠️ Максимальная длина сообщения: 1000 символов";
+            case KG -> "✍️ Кайрылууңузду жазыңыз:\n\n" +
+                    "Сураныч, көйгөйүңүздү же суроонузду сүрөттөп бериңиз. " +
+                    "Биздин оператор аны карап чыгып, жакынкы убакта жооп берет.\n\n" +
+                    "⚠️ Билдирүүнүн максималдуу узундугу: 1000 символ";
+            case EN -> "✍️ Write your request:\n\n" +
+                    "Please describe your problem or question. " +
+                    "Our operator will review it and respond shortly.\n\n" +
+                    "⚠️ Maximum message length: 1000 characters";
+        };
+    }
+    
+    public String getRequestCancelledMessage(Language language) {
+        return switch (language) {
+            case RU -> "❌ Создание обращения отменено";
+            case KG -> "❌ Кайрылуу түзүү жокко чыгарылды";
+            case EN -> "❌ Request creation cancelled";
+        };
+    }
+    
+    public String getRequestConfirmationMessage(Language language, String messageText) {
+        return switch (language) {
+            case RU -> "✅ Ваше обращение принято!\n\n" +
+                    "📝 Текст обращения: " + messageText + "\n\n" +
+                    "Наш оператор свяжется с вами в ближайшее время. " +
+                    "Пожалуйста, ожидайте ответа в этом чате.";
+            case KG -> "✅ Сиздин кайрылууңуз кабыл алынды!\n\n" +
+                    "📝 Кайрылуунун тексти: " + messageText + "\n\n" +
+                    "Биздин оператор сиз менен жакынкы убакта байланышат. " +
+                    "Сураныч, бул чатта жоопту күтүңүз.";
+            case EN -> "✅ Your request has been accepted!\n\n" +
+                    "📝 Request text: " + messageText + "\n\n" +
+                    "Our operator will contact you shortly. " +
+                    "Please wait for a response in this chat.";
+        };
+    }
+    
+    public String getRequestTooLongMessage(Language language, int maxLength) {
+        return switch (language) {
+            case RU -> "⚠️ Ваше сообщение слишком длинное!\n\n" +
+                    "Максимальная длина: " + maxLength + " символов\n" +
+                    "Ваше сообщение: " + "символов\n\n" +
+                    "Пожалуйста, сократите текст и отправьте снова.";
+            case KG -> "⚠️ Сиздин билдирүүңүз өтө узун!\n\n" +
+                    "Максималдуу узундук: " + maxLength + " символ\n" +
+                    "Сиздин билдирүү: " + "символ\n\n" +
+                    "Сураныч, текстти кыскартып, кайра жөнөтүңүз.";
+            case EN -> "⚠️ Your message is too long!\n\n" +
+                    "Maximum length: " + maxLength + " characters\n" +
+                    "Your message: " + "characters\n\n" +
+                    "Please shorten the text and send again.";
+        };
+    }
+    
+    public String getRateLimitMessage(Language language, int maxRequests, int hours) {
+        return switch (language) {
+            case RU -> "⚠️ Превышен лимит обращений!\n\n" +
+                    "Вы можете отправить не более " + maxRequests + " обращений в течение " + hours + " часов.\n" +
+                    "Пожалуйста, дождитесь ответа на предыдущие обращения.";
+            case KG -> "⚠️ Кайрылуулардын чеги ашты!\n\n" +
+                    "Сиз " + hours + " саат ичинде " + maxRequests + " кайрылуудан көп жөнөтө албайсыз.\n" +
+                    "Сураныч, мурунку кайрылууларга жоопту күтүңүз.";
+            case EN -> "⚠️ Request limit exceeded!\n\n" +
+                    "You can send no more than " + maxRequests + " requests within " + hours + " hours.\n" +
+                    "Please wait for responses to previous requests.";
+        };
+    }
+    
+    public String getOperatorResponseMessage(Language language, String responseText) {
+        return switch (language) {
+            case RU -> "💬 Ответ оператора:\n\n" + responseText + 
+                    "\n\n---\nЕсли у вас есть еще вопросы, нажмите '📞 Обращение' снова.";
+            case KG -> "💬 Оператордун жообу:\n\n" + responseText + 
+                    "\n\n---\nЭгер дагы суроолоруңуз болсо, '📞 Кайрылуу' баскычын кайра басыңыз.";
+            case EN -> "💬 Operator response:\n\n" + responseText + 
+                    "\n\n---\nIf you have more questions, press '📞 Statement' again.";
+        };
+    }
+    
+    public String getCancelButtonText(Language language) {
+        return switch (language) {
+            case RU -> "❌ Отменить";
+            case KG -> "❌ Жокко чыгаруу";
+            case EN -> "❌ Cancel";
+        };
+    }
+    
     public String[] getMenuButtons(Language language) {
         return switch (language) {
             case RU -> new String[]{"📖 О Федерации", "ℹ️ Контакты", "📰 Новости","📞 Обращение"};

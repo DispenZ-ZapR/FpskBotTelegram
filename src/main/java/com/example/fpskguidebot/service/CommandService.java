@@ -1,6 +1,7 @@
 package com.example.fpskguidebot.service;
 
 import com.example.fpskguidebot.enums.Language;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -12,15 +13,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class CommandService {
 
     private final UserLanguageService userLanguageService;
     private final MessageService messageService;
-
-    public CommandService(UserLanguageService userLanguageService, MessageService messageService) {
-        this.userLanguageService = userLanguageService;
-        this.messageService = messageService;
-    }
+    private final UserStateService userStateService;
 
     public SendMessage handleStartCommand(long chatId) {
         SendMessage message = new SendMessage();
@@ -249,6 +247,10 @@ public class CommandService {
             String languageCode = callbackData.substring(5);
             return handleLanguageSelection(chatId, languageCode);
         }
+        
+        if (callbackData.equals("cancel_request")) {
+            return handleCancelRequest(chatId);
+        }
 
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -275,6 +277,16 @@ public class CommandService {
         }
 
         message.enableMarkdown(true);
+        return message;
+    }
+    
+    private SendMessage handleCancelRequest(long chatId) {
+        Language userLang = userLanguageService.getUserLanguage(chatId);
+        userStateService.clearUserState(chatId);
+        
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(messageService.getRequestCancelledMessage(userLang));
         return message;
     }
 }

@@ -3,9 +3,7 @@ package com.example.fpskguidebot;
 import com.example.fpskguidebot.enums.Language;
 import com.example.fpskguidebot.model.UserRequest;
 import com.example.fpskguidebot.repository.UserRequestRepository;
-import com.example.fpskguidebot.service.CommandService;
-import com.example.fpskguidebot.service.RequestService;
-import com.example.fpskguidebot.service.UserLanguageService;
+import com.example.fpskguidebot.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +22,8 @@ public class FpskBot extends TelegramLongPollingBot {
     private final RequestService requestService;
     private final UserRequestRepository userRequestRepository;
     private final UserLanguageService userLanguageService;
+    private final UserStateService userStateService;
+    private final MessageService messageService;
 
     @Value("${bot.token}")
     private String botToken;
@@ -33,9 +33,6 @@ public class FpskBot extends TelegramLongPollingBot {
 
     @Value("${operator.chat.id:1083645714}")
     private Long operatorChatId;
-    
-    // Храним состояние пользователей в ожидании ввода сообщения
-    private final java.util.Set<Long> usersWaitingForMessage = new java.util.HashSet<>();
 
     @Override
     public String getBotUsername() {
@@ -65,7 +62,7 @@ public class FpskBot extends TelegramLongPollingBot {
         long chatId = update.getMessage().getChatId();
         
         // Проверяем, ожидает ли пользователь ввод сообщения для обращения
-        if (usersWaitingForMessage.contains(chatId)) {
+        if (userStateService.isUserWaitingForRequest(chatId)) {
             handleUserMessage(chatId, update);
             return;
         }
@@ -122,13 +119,7 @@ public class FpskBot extends TelegramLongPollingBot {
     }
 
     private SendMessage createDefaultResponse(long chatId, String messageText) {
-        // Получаем язык пользователя для сообщения об ошибке
-        com.example.fpskguidebot.service.MessageService messageService = 
-            new com.example.fpskguidebot.service.MessageService();
-        com.example.fpskguidebot.service.UserLanguageService userLanguageService = 
-            new com.example.fpskguidebot.service.UserLanguageService();
-        
-        com.example.fpskguidebot.enums.Language userLang = userLanguageService.getUserLanguage(chatId);
+        Language userLang = userLanguageService.getUserLanguage(chatId);
         
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -184,51 +175,80 @@ public class FpskBot extends TelegramLongPollingBot {
     private SendMessage startSupportRequest(long chatId, Update update) {
         Language userLang = userLanguageService.getUserLanguage(chatId);
         
+        // Проверяем rate limiting
+        if (!requestService.canCreateRequest(chatId)) {
+            SendMessage message = new SendMessage();
+            message.setChatId(String.valueOf(chatId));
+            message.setText(messageService.getRateLimitMessage(
+                userLang, 
+                requestService.getMaxRequestsPerHour(), 
+                1
+            ));
+            return message;
+        }
+        
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText("Напишите ваше обращение:\n\n" +
-                       "Пожалуйста, опишите вашу проблему или вопрос. " +
-                       "Наш оператор рассмотрит его и ответит в ближайшее время.\n\n" +
-                       "Для отмены введите /cancel");
+        message.setText(messageService.getRequestPromptMessage(userLang));
         
-        // Добавляем пользователя в список ожидающих ввод сообщения
-        usersWaitingForMessage.add(chatId);
+        // Создаем inline клавиатуру с кнопкой отмены
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup markup = 
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup();
+        java.util.List<java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton>> rows = 
+            new java.util.ArrayList<>();
+        
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton cancelButton = 
+            new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton();
+        cancelButton.setText(messageService.getCancelButtonText(userLang));
+        cancelButton.setCallbackData("cancel_request");
+        
+        java.util.List<org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton> row = 
+            new java.util.ArrayList<>();
+        row.add(cancelButton);
+        rows.add(row);
+        
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        
+        // Устанавливаем состояние пользователя
+        userStateService.setUserState(chatId, UserStateService.STATE_WAITING_FOR_REQUEST);
         
         return message;
     }
     
     private void handleUserMessage(long chatId, Update update) throws TelegramApiException {
         String messageText = update.getMessage().getText();
+        Language userLang = userLanguageService.getUserLanguage(chatId);
         
-        if (messageText.equals("/cancel")) {
-            usersWaitingForMessage.remove(chatId);
-            
-            SendMessage cancelMessage = new SendMessage();
-            cancelMessage.setChatId(String.valueOf(chatId));
-            cancelMessage.setText("❌ Создание обращения отменено");
-            execute(cancelMessage);
+        // Проверка длины сообщения
+        if (messageText.length() > requestService.getMaxMessageLength()) {
+            SendMessage errorMessage = new SendMessage();
+            errorMessage.setChatId(String.valueOf(chatId));
+            errorMessage.setText(messageService.getRequestTooLongMessage(
+                userLang, 
+                requestService.getMaxMessageLength()
+            ));
+            execute(errorMessage);
             return;
         }
         
         // Создаем обращение в БД
         String username = update.getMessage().getFrom().getUserName();
         String firstName = update.getMessage().getFrom().getFirstName();
-        Language userLang = userLanguageService.getUserLanguage(chatId);
         
-        UserRequest savedRequest = requestService.createRequest(chatId, username, firstName, messageText, userLang);
+        UserRequest savedRequest = requestService.createRequest(
+            chatId, username, firstName, messageText, userLang
+        );
         
         // Отправляем уведомление оператору
         requestService.sendNotificationToOperator(savedRequest, this);
         
-        // Удаляем пользователя из списка ожидающих
-        usersWaitingForMessage.remove(chatId);
+        // Очищаем состояние пользователя
+        userStateService.clearUserState(chatId);
         
         SendMessage confirmMessage = new SendMessage();
         confirmMessage.setChatId(String.valueOf(chatId));
-        confirmMessage.setText("Ваше обращение принято!\n\n" +
-                           "Текст обращения: " + messageText + "\n\n" +
-                           "Наш оператор свяжется с вами в ближайшее время. " +
-                           "Пожалуйста, ожидайте ответа в этом чате.");
+        confirmMessage.setText(messageService.getRequestConfirmationMessage(userLang, messageText));
         execute(confirmMessage);
     }
 }

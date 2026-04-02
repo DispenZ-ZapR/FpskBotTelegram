@@ -59,4 +59,7 @@ public class UserRequest {
     @Column(name = "operator_name")
     private String operatorName;
 
+    @Column(name = "is_read")
+    private Boolean isRead = false;
+
 }
